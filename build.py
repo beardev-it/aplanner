@@ -10,7 +10,7 @@ head='''<title>WiFi Coverage Planner</title>
 <style>
 '''+css+'</style>\n'
 content=head+body+vendor+'<script>\n'+js+'\n</script>\n'
-pathlib.Path('dist/artifact.html').write_text(content)
+pathlib.Path('dist').mkdir(parents=True, exist_ok=True); pathlib.Path('dist/artifact.html').write_text(content)
 full='<!DOCTYPE html>\n<html lang="it">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'+head+'</head>\n<body>\n'+body+vendor+'<script>\n'+js+'\n</script>\n</body>\n</html>\n'
 pathlib.Path('dist/WiFiCoverage.html').write_text(full)
 print(len(full))
