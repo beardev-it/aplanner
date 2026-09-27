@@ -9,7 +9,7 @@ Il cuore dell'applicazione è una web app in un unico file HTML (nessuna dipende
 ```
 src/            sorgenti della web app (catalog.js, dxf.js, engine.js, pdfplan.js, app.js, body.html, style.css)
 src/vendor/     librerie di terze parti vendorizzate (pdf.js, jsPDF)
-build.py        concatena src/ in dist/WiFiCoverage.html (web app autonoma) e dist/artifact.html
+build.js        concatena src/ in dist/WiFiCoverage.html (web app autonoma) e dist/artifact.html (usato da "npm run build:web"; build.py fa lo stesso in Python)
 dist/           output della build web + LEGGIMI.md (guida utente in italiano)
 electron/       wrapper Electron (finestra nativa, menu, gestione dei download/esportazioni)
 build-resources/ icona dell'app

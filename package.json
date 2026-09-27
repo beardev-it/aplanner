@@ -9,7 +9,7 @@
   "main": "electron/main.js",
   "homepage": "https://github.com/",
   "scripts": {
-    "build:web": "python3 build.py",
+    "build:web": "node build.js",
     "start": "npm run build:web && electron .",
     "dist:linux": "npm run build:web && electron-builder --linux",
     "dist:win": "npm run build:web && electron-builder --win",
