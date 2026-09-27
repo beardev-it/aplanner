@@ -1,0 +1,77 @@
+name: Build APlanner
+
+# Compila l'app desktop nativamente su Windows, macOS e Linux (i runner di GitHub Actions
+# forniscono ciascun sistema operativo reale: da qui il .exe, il .dmg e l'AppImage/.deb).
+#
+# - push su un tag "v*" (es. v1.0.0)  -> compila e pubblica una GitHub Release con gli installer allegati
+# - workflow_dispatch (avvio manuale) -> compila e carica solo gli artifact di build, senza release
+# - pull_request                      -> compila per verificare che tutto funzioni, senza pubblicare nulla
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: {}
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            script: dist:win
+          - os: macos-latest
+            script: dist:mac
+          - os: ubuntu-latest
+            script: dist:linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Installa le dipendenze
+        run: npm install
+
+      - name: Compila la web app e crea gli installer
+        run: npm run ${{ matrix.script }}
+
+      - name: Carica gli installer come artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aplanner-${{ matrix.os }}
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.zip
+            release/*.AppImage
+            release/*.deb
+            release/*.blockmap
+          if-no-files-found: warn
+
+      - name: Pubblica su GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/*.exe
+            release/*.dmg
+            release/*.zip
+            release/*.AppImage
+            release/*.deb
+          draft: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

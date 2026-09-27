@@ -1,0 +1,187 @@
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.2a9.5 9.5 0 0 1 13 0M8.6 15.4a5 5 0 0 1 6.8 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="19" r="1.8" fill="currentColor"/></svg>
+      <b>WiFi Coverage</b><span>pianta DXF · MikroTik</span>
+    </div>
+    <div class="tb">
+      <button class="btn primary" id="btnOpen">Apri pianta (DXF o PDF)</button>
+      <button class="btn" id="btnDemo">Esempio</button>
+      <span class="sep"></span>
+      <button class="btn" id="btnSave">Salva progetto</button>
+      <button class="btn" id="btnLoad">Apri progetto</button>
+      <span class="sep"></span>
+      <button class="btn" id="btnPng">Esporta PNG</button>
+      <button class="btn" id="btnDxfOut">Esporta DXF</button>
+      <select id="reportScope" class="tb-sel" aria-label="Bande incluse nel report" title="Bande incluse nel report">
+        <option value="cur">Report PDF: banda corrente</option>
+        <option value="both">Report PDF: 2,4 + 5 GHz</option>
+      </select>
+      <button class="btn" id="btnReport">Genera</button>
+    </div>
+    <div class="seg band-seg" id="bandSeg" role="group" aria-label="Banda">
+      <button data-band="24">2,4 GHz</button><button data-band="5" class="on">5 GHz</button>
+    </div>
+    <div class="progress" title="Avanzamento calcolo"><i id="prog"></i></div>
+    <input type="file" id="fileDxf" accept=".dxf,.DXF,.pdf,.PDF,.dwg,.DWG" hidden>
+    <input type="file" id="fileProj" accept=".json,.wifimap" hidden>
+  </header>
+
+  <div class="main">
+    <aside class="side">
+      <nav class="tabs" id="tabs">
+        <button data-tab="plan" class="on"><small>1</small>Pianta</button>
+        <button data-tab="obst"><small>2</small>Ostacoli</button>
+        <button data-tab="aps"><small>3</small>AP</button>
+        <button data-tab="calc"><small>4</small>Mappa</button>
+      </nav>
+
+      <!-- 1. PIANTA -->
+      <section class="pane" data-pane="plan">
+        <div class="drop" id="drop"><b>Trascina qui la pianta in DXF o PDF</b><br>oppure fai clic per sceglierla. Dal CAD va bene anche un PDF stampato in scala: le linee vengono lette come vettori.</div>
+        <div class="card">
+          <dl class="kv" id="fileInfo"></dl>
+        </div>
+        <div class="group">
+          <h3>Scala</h3>
+          <div class="row" id="unitRow"><label for="unitSel">Unità del disegno</label>
+            <select id="unitSel">
+              <option value="0.001">millimetri</option><option value="0.01">centimetri</option><option value="0.1">decimetri</option>
+              <option value="1">metri</option><option value="0.0254">pollici</option><option value="0.3048">piedi</option><option value="custom">calibrata</option>
+            </select></div>
+          <div class="group" id="pdfBox" hidden>
+            <div class="row"><label for="pdfScale">Scala di stampa 1:</label><input type="number" id="pdfScale" list="scaleList" min="1" step="any"></div>
+            <datalist id="scaleList"><option value="50"><option value="100"><option value="125"><option value="150"><option value="200"><option value="250"><option value="500"></datalist>
+            <dl class="kv" id="sheetInfo"></dl>
+            <div class="row" id="pdfPageRow" hidden><label for="pdfPage">Pagina</label><select id="pdfPage"></select></div>
+            <div class="row"><label for="bgShow">PDF come sfondo</label><input type="checkbox" id="bgShow"><input type="range" id="bgOpacity" min="0.1" max="1" step="0.05" aria-label="Opacità sfondo"></div>
+          </div>
+          <p class="hint" id="unitHint"></p>
+          <div class="row"><button class="btn" id="btnCalib">Calibra con una misura nota</button></div>
+          <div class="card" id="calibBox" hidden>
+            <p class="hint">Fai clic su due punti di cui conosci la distanza reale: per esempio gli estremi della scala grafica (0–10 m) o una quota. Con un PDF il programma calcola la scala di stampa effettiva.</p>
+            <div class="row"><label>Misurata</label><span class="num" id="calibMeas">–</span></div>
+            <div class="row"><label for="calibReal">Distanza reale (m)</label><input type="number" id="calibReal" step="0.01" min="0.01"></div>
+            <div class="row"><button class="btn primary" id="calibApply" disabled>Applica scala</button><button class="btn" id="calibCancel">Annulla</button></div>
+          </div>
+        </div>
+        <div class="group">
+          <h3>Area di calcolo</h3>
+          <p class="hint">Di default copre la parte principale del disegno, escludendo cornice, cartiglio e parti staccate (mostrate tratteggiate). Per calcolare un'altra parte, disegna l'area.</p>
+          <div class="row"><button class="btn" id="btnArea">Disegna area</button><button class="btn" id="btnAreaReset">Area automatica</button></div>
+          <dl class="kv" id="areaInfo"></dl>
+        </div>
+        <div class="group">
+          <h3>Visualizzazione</h3>
+          <div class="row"><label for="showTexts">Testi della pianta</label><input type="checkbox" id="showTexts" checked></div>
+          <div class="row"><label for="wallColor">Colore linee</label><select id="wallColor"><option value="mat">per materiale</option><option value="plain">monocromatico</option></select></div>
+        </div>
+      </section>
+
+      <!-- 2. OSTACOLI -->
+      <section class="pane" data-pane="obst" hidden>
+        <div class="group">
+          <h3>Rilevamento spessore</h3>
+          <p class="hint">Le linee parallele vicine sullo stesso layer vengono lette come le due facce di un muro: la loro distanza è lo spessore. Le linee singole usano lo spessore di default del layer.</p>
+          <div class="row"><label for="detMin">Spessore min (cm)</label><input type="number" id="detMin" min="0.5" max="50" step="0.5"></div>
+          <div class="row"><label for="detMax">Spessore max (cm)</label><input type="number" id="detMax" min="5" max="150" step="1"></div>
+          <div class="row"><label for="detAng">Tolleranza parallelismo (°)</label><input type="number" id="detAng" min="0.5" max="10" step="0.5"></div>
+          <div class="row"><label for="detSame">Solo stesso layer</label><input type="checkbox" id="detSame"></div>
+          <div class="row"><label for="detArcs">Ignora archi delle porte</label><input type="checkbox" id="detArcs"></div>
+        </div>
+        <div class="group">
+          <h3>Spessori rilevati</h3>
+          <div class="hist" id="thickHist"></div>
+        </div>
+        <div class="group">
+          <h3>Layer e materiali</h3>
+          <p class="hint">Passa il mouse su una riga per evidenziare le sue linee sulla pianta. <b>Auto da spessore</b>: fino a 13,5 cm tramezzo forato, fino a 28 cm laterizio, oltre muratura portante.</p>
+          <div class="tbl-wrap"><table id="layerTbl"><thead><tr><th title="Visibile e attivo">On</th><th>Layer</th><th>Materiale</th><th title="Spessore per linee singole (cm)">cm</th></tr></thead><tbody></tbody></table></div>
+        </div>
+        <div class="group">
+          <h3>Disegna muri a mano</h3>
+          <p class="hint">Per PDF scansionati o per completare la pianta: scegli materiale e spessore, poi fai clic sui vertici del muro.</p>
+          <div class="row"><label for="wallMat">Materiale</label><select id="wallMat"></select></div>
+          <div class="row"><label for="wallT">Spessore (cm)</label><input type="number" id="wallT" min="1" max="100" step="1"></div>
+          <div class="row"><button class="btn" id="btnWall">Disegna muri</button><button class="btn" id="btnWallUndo">Annulla ultimo</button></div>
+        </div>
+        <div class="group">
+          <h3>Attenuazione materiali</h3>
+          <p class="hint">Perdita per attraversamento = base + dB/cm × spessore, aumentata per incidenza obliqua (fino a ×3).</p>
+          <div class="tbl-wrap"><table id="matTbl"><thead><tr><th>Materiale</th><th>2,4 base</th><th>2,4 dB/cm</th><th>5 base</th><th>5 dB/cm</th></tr></thead><tbody></tbody></table></div>
+          <div class="row"><button class="btn small" id="matReset">Ripristina valori tipici</button></div>
+        </div>
+      </section>
+
+      <!-- 3. ACCESS POINT -->
+      <section class="pane" data-pane="aps" hidden>
+        <div class="group">
+          <h3>Catalogo MikroTik</h3>
+          <div class="row">
+            <input type="text" id="catSearch" placeholder="Cerca modello…" aria-label="Cerca modello">
+            <select id="catFilter" aria-label="Filtro banda"><option value="all">Tutti</option><option value="dual">Dual band</option><option value="24">Solo con 2,4</option><option value="5">Solo con 5</option></select>
+          </div>
+          <div class="cat-list" id="catList"></div>
+          <p class="hint" id="catNote"></p>
+          <div class="row"><button class="btn primary" id="btnPlace">Posiziona sulla pianta</button><button class="btn" id="btnCustom">Modello personalizzato</button></div>
+          <div class="card" id="customBox" hidden>
+            <div class="row"><label for="cuName">Nome</label><input type="text" id="cuName" value="AP personalizzato"></div>
+            <div class="row"><label for="cuG24">2,4 GHz guadagno / TX</label><input type="number" id="cuG24" value="3" step="0.1"><input type="number" id="cuT24" value="20" step="0.5"></div>
+            <div class="row"><label for="cuG5">5 GHz guadagno / TX</label><input type="number" id="cuG5" value="5" step="0.1"><input type="number" id="cuT5" value="23" step="0.5"></div>
+            <div class="row"><label for="cuBeam">Apertura (°)</label><input type="number" id="cuBeam" value="360" min="10" max="360"></div>
+            <p class="hint">Lascia vuota la potenza di una banda se il modello non la supporta.</p>
+            <div class="row"><button class="btn primary" id="cuAdd">Aggiungi al catalogo</button></div>
+          </div>
+        </div>
+        <div class="group">
+          <h3>AP sulla pianta</h3>
+          <div class="ap-list" id="apList"></div>
+        </div>
+        <div class="card" id="apEdit" hidden></div>
+      </section>
+
+      <!-- 4. MAPPA -->
+      <section class="pane" data-pane="calc" hidden>
+        <div class="group">
+          <h3>Tipo di mappa</h3>
+          <div class="seg mode-seg" id="modeSeg">
+            <button data-mode="server" class="on">Provenienza</button><button data-mode="areas">Aree per AP</button><button data-mode="heat">Segnale</button><button data-mode="sinr">SINR</button>
+          </div>
+          <p class="hint" id="modeHint"></p>
+        </div>
+        <div class="group">
+          <h3>Soglia di copertura</h3>
+          <div class="row"><input type="range" id="thr" min="-90" max="-50" step="1"><span class="num" id="thrVal"></span></div>
+          <p class="hint">−67 dBm: voce e video. −72 dBm: dati. −80 dBm: connessione minima.</p>
+          <div class="row"><label for="shade">Sfumatura per intensità</label><input type="checkbox" id="shade" checked></div>
+          <div class="row"><label for="smooth">Addolcisci ombre (diffrazione)</label><input type="checkbox" id="smooth" checked></div>
+        </div>
+        <div class="group">
+          <h3>Modello di propagazione</h3>
+          <div class="row"><label for="pn">Esponente distanza n</label><input type="number" id="pn" min="1.6" max="4" step="0.1"></div>
+          <div class="row"><label for="hAp">Altezza AP (m)</label><input type="number" id="hAp" min="0" max="20" step="0.1"></div>
+          <div class="row"><label for="hCli">Altezza client (m)</label><input type="number" id="hCli" min="0" max="3" step="0.1"></div>
+          <div class="row"><label for="margin">Margine (dB)</label><input type="number" id="margin" min="0" max="20" step="1"></div>
+          <div class="row"><label for="reg">Limite di potenza</label><select id="reg"></select></div>
+          <div class="row"><label for="txAll">Potenza TX tutti gli AP</label><select id="txAll"></select></div>
+          <div class="row"><label for="res">Risoluzione</label><select id="res"><option value="180">Bassa (veloce)</option><option value="320">Media</option><option value="520">Alta</option><option value="800">Molto alta</option></select></div>
+          <p class="hint">Modello multi-wall: perdita in spazio libero a 1 m + 10·n·log(d) + somma delle perdite degli ostacoli attraversati lungo il raggio diretto.</p>
+        </div>
+        <div class="group">
+          <h3>Risultato</h3>
+          <dl class="kv" id="stats"></dl>
+        </div>
+      </section>
+    </aside>
+
+    <div class="stage" id="stage">
+      <canvas id="cv"></canvas>
+      <div class="toolhint" id="toolHint" hidden></div>
+      <div class="legend" id="legend"></div>
+      <div class="zoombox"><button class="btn" id="zIn" aria-label="Zoom avanti">+</button><button class="btn" id="zOut" aria-label="Zoom indietro">−</button><button class="btn" id="zFit" aria-label="Adatta" title="Adatta alla vista">⤢</button></div>
+      <div class="scalebar" id="scalebar"><i></i><span></span></div>
+    </div>
+  </div>
+  <footer class="statusbar"><span class="sb-info" id="statusbar"><span>Pronto</span></span><span class="status-msg" id="statusMsg"></span></footer>
+</div>
+<div class="toast" id="toast" hidden></div>
