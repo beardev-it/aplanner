@@ -1,7 +1,7 @@
 {
   "name": "aplanner",
   "productName": "APlanner",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Pianificazione della copertura WiFi su piante CAD (DXF/PDF) con access point MikroTik",
   "author": "Dario Giusti",
   "license": "UNLICENSED",
