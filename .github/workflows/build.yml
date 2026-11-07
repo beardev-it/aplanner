@@ -32,11 +32,12 @@ jobs:
             script: dist:linux
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          # sempre la LTS attiva più recente di Node.js
+          node-version: lts/*
 
       - name: Installa le dipendenze
         run: npm install
@@ -45,7 +46,7 @@ jobs:
         run: npm run ${{ matrix.script }}
 
       - name: Carica gli installer come artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: aplanner-${{ matrix.os }}
           path: |
@@ -59,7 +60,7 @@ jobs:
 
       - name: Pubblica su GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             release/*.exe
