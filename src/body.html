@@ -18,6 +18,14 @@
         <option value="both">Report PDF: 2,4 + 5 GHz</option>
       </select>
       <button class="btn" id="btnReport">Genera</button>
+      <span class="sep"></span>
+      <select id="instFormat" class="tb-sel" aria-label="Formato della pianta per l'installatore" title="Formato del foglio (orizzontale)">
+        <option value="a3">Pianta installatore: A3</option>
+        <option value="a4">Pianta installatore: A4</option>
+        <option value="a2">Pianta installatore: A2</option>
+        <option value="a1">Pianta installatore: A1</option>
+      </select>
+      <button class="btn" id="btnInstaller" title="PDF in scala con solo pianta, posizioni e nomi degli AP, senza aree di copertura">Stampa</button>
     </div>
     <div class="seg band-seg" id="bandSeg" role="group" aria-label="Banda">
       <button data-band="24">2,4 GHz</button><button data-band="5" class="on">5 GHz</button>

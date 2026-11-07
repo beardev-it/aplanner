@@ -45,7 +45,10 @@
   function toast(msg, ms = 3500) { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, ms); }
   function setStatus(msg) { $('statusMsg').textContent = msg || ''; }
   function hexRgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
-  function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+  // in stampa (pianta per installatore) si usa sempre la tavolozza chiara, anche col tema scuro
+  let printMode = false;
+  const PRINT_VARS = { '--paper': '#ffffff', '--panel': '#ffffff', '--ink': '#111111', '--muted': '#555555', '--plan-ink': '#1c1c1c', '--plan-faint': '#a3a8a6', '--danger': '#b3261e' };
+  function cssVar(n) { if (printMode && PRINT_VARS[n]) return PRINT_VARS[n]; return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
   const modelOf = (id) => S.catalog.find(m => m.id === id) || S.catalog[0];
   const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const ACI = { 1: '#ff0000', 2: '#ffff00', 3: '#00ff00', 4: '#00ffff', 5: '#0000ff', 6: '#ff00ff', 7: '#888888', 8: '#808080', 9: '#c0c0c0' };
@@ -602,9 +605,9 @@
       ctx.restore();
     }
     // griglia 1 m / 5 m
-    drawGrid();
+    if (!printMode) drawGrid();
     // mappa
-    if (composite && S.grid) {
+    if (composite && S.grid && !printMode) {
       const g = S.grid;
       ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(composite.canvas, sx(g.x0), sy(g.y0 + g.h * g.cs), g.w * g.cs * S.view.s, g.h * g.cs * S.view.s);
@@ -620,7 +623,7 @@
       const ink = cssVar('--plan-ink');
       for (const m in planPaths.byMat) {
         const mat = S.materials[m];
-        ctx.strokeStyle = S.wallColor === 'mat' && mat ? mat.color : ink;
+        ctx.strokeStyle = S.wallColor === 'mat' && mat && !printMode ? mat.color : ink;
         ctx.lineWidth = (m === 'arredo' ? 1 : 1.4) / S.view.s;
         ctx.stroke(planPaths.byMat[m].path);
       }
@@ -630,13 +633,13 @@
       }
     }
     // layer evidenziato (passaggio del mouse sulla tabella)
-    if (S.hiLayer) {
+    if (S.hiLayer && !printMode) {
       ctx.beginPath();
       for (const sg of S.segsM) if (sg.layer === S.hiLayer) { ctx.moveTo(sx(sg.x1), sy(sg.y1)); ctx.lineTo(sx(sg.x2), sy(sg.y2)); }
       ctx.strokeStyle = cssVar('--accent'); ctx.lineWidth = 3; ctx.globalAlpha = .85; ctx.stroke(); ctx.globalAlpha = 1;
     }
     // muro in disegno
-    if (S.tool === 'wall' && wallDraw.pts.length) {
+    if (S.tool === 'wall' && wallDraw.pts.length && !printMode) {
       const last = wallDraw.pts[wallDraw.pts.length - 1];
       const m = S.materials[S.wallMat];
       ctx.strokeStyle = m ? m.color : cssVar('--accent'); ctx.lineWidth = Math.max(2, S.wallT / 100 * S.view.s); ctx.lineCap = 'round';
@@ -657,7 +660,7 @@
       }
     }
     // isolinee
-    if (composite) {
+    if (composite && !printMode) {
       ctx.lineJoin = 'round';
       for (const c of composite.contours) {
         ctx.beginPath();
@@ -670,28 +673,29 @@
       }
     }
     // altre parti staccate del disegno (non incluse nell'area automatica)
-    if (!S.area && S.parts && S.parts.others) {
+    if (!S.area && S.parts && S.parts.others && !printMode) {
       ctx.setLineDash([2, 4]); ctx.strokeStyle = cssVar('--plan-faint'); ctx.lineWidth = 1;
       for (const o of S.parts.others) ctx.strokeRect(sx(o.x0), sy(o.y1), (o.x1 - o.x0) * S.view.s, (o.y1 - o.y0) * S.view.s);
       ctx.setLineDash([]);
     }
     // area di calcolo
-    if (a) {
+    if (a && !printMode) {
       ctx.setLineDash([6, 5]); ctx.strokeStyle = cssVar('--muted'); ctx.lineWidth = 1;
       ctx.strokeRect(sx(a.x0), sy(a.y1), (a.x1 - a.x0) * S.view.s, (a.y1 - a.y0) * S.view.s); ctx.setLineDash([]);
     }
-    if (drag && drag.kind === 'area') {
+    if (drag && drag.kind === 'area' && !printMode) {
       const x0 = Math.min(drag.x0, drag.x1), x1 = Math.max(drag.x0, drag.x1), y0 = Math.min(drag.y0, drag.y1), y1 = Math.max(drag.y0, drag.y1);
       ctx.fillStyle = 'rgba(11,110,122,.08)'; ctx.fillRect(sx(x0), sy(y1), (x1 - x0) * S.view.s, (y1 - y0) * S.view.s);
       ctx.strokeStyle = cssVar('--accent'); ctx.strokeRect(sx(x0), sy(y1), (x1 - x0) * S.view.s, (y1 - y0) * S.view.s);
     }
     // calibrazione
-    if (calib.pts.length) {
+    if (calib.pts.length && !printMode) {
       ctx.strokeStyle = cssVar('--accent'); ctx.fillStyle = cssVar('--accent'); ctx.lineWidth = 2;
       ctx.beginPath(); calib.pts.forEach(([x, y], i) => i ? ctx.lineTo(sx(x), sy(y)) : ctx.moveTo(sx(x), sy(y))); if (calib.hover && calib.pts.length === 1) ctx.lineTo(sx(calib.hover[0]), sy(calib.hover[1])); ctx.stroke();
       for (const [x, y] of calib.pts) { ctx.beginPath(); ctx.arc(sx(x), sy(y), 4, 0, 7); ctx.fill(); }
     }
     // AP
+    if (printMode) { S.aps.forEach((ap, i) => drawApPrint(ap, i + 1)); return; }
     for (const ap of S.aps) drawAp(ap);
     if (S.tool === 'add' && hoverW) {
       ctx.globalAlpha = .5; drawApShape(sx(hoverW[0]), sy(hoverW[1]), cssVar('--accent'), false); ctx.globalAlpha = 1;
@@ -740,6 +744,33 @@
     ctx.strokeStyle = ap.color; ctx.lineWidth = 1; roundRect(bx, by, bw, 34, 5); ctx.stroke();
     ctx.fillStyle = cssVar('--ink'); ctx.font = `600 12px ${cssVar('--sans')}`; ctx.fillText(label, bx + 6, by + 14);
     ctx.fillStyle = p ? cssVar('--muted') : cssVar('--danger'); ctx.font = `11px ${cssVar('--mono')}`; ctx.fillText(sub, bx + 6, by + 28);
+    ctx.restore();
+  }
+  // AP nella pianta per l'installatore: cerchio numerato + nome e modello, senza dati radio
+  function drawApPrint(ap, num) {
+    const X = sx(ap.x), Y = sy(ap.y), m = modelOf(ap.model);
+    ctx.save(); ctx.translate(X, Y); ctx.scale(K, K);
+    if (m.beam < 360) {
+      const r = 34, a0 = -(ap.az * Math.PI / 180);
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, r, a0 - m.beam * Math.PI / 360, a0 + m.beam * Math.PI / 360); ctx.closePath();
+      ctx.fillStyle = ap.color + '30'; ctx.fill(); ctx.strokeStyle = ap.color; ctx.lineWidth = 1; ctx.stroke();
+    }
+    // mirino per indicare il punto esatto
+    ctx.strokeStyle = '#111'; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.moveTo(-15, 0); ctx.lineTo(15, 0); ctx.moveTo(0, -15); ctx.lineTo(0, 15); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2); ctx.fillStyle = ap.color; ctx.fill();
+    ctx.lineWidth = 1.6; ctx.strokeStyle = '#ffffff'; ctx.stroke();
+    ctx.fillStyle = '#ffffff'; ctx.font = `700 ${num > 9 ? 9 : 10.5}px ${cssVar('--sans')}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(String(num), 0, 0.5);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    const label = ap.name, sub = m.name;
+    ctx.font = `700 12px ${cssVar('--sans')}`; const w1 = ctx.measureText(label).width;
+    ctx.font = `10px ${cssVar('--sans')}`; const w2 = ctx.measureText(sub).width;
+    const bw = Math.max(w1, w2) + 10, bx = 14, by = -16;
+    ctx.fillStyle = '#ffffff'; ctx.globalAlpha = .92; roundRect(bx, by, bw, 30, 4); ctx.fill(); ctx.globalAlpha = 1;
+    ctx.strokeStyle = ap.color; ctx.lineWidth = 1; roundRect(bx, by, bw, 30, 4); ctx.stroke();
+    ctx.fillStyle = '#111'; ctx.font = `700 12px ${cssVar('--sans')}`; ctx.fillText(label, bx + 5, by + 13);
+    ctx.fillStyle = '#444'; ctx.font = `10px ${cssVar('--sans')}`; ctx.fillText(sub, bx + 5, by + 25);
     ctx.restore();
   }
   function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
@@ -1036,6 +1067,7 @@
       ${bandRow('24')}${bandRow('5')}
       ${m.beam < 360 ? `<div class="row"><label>Orientamento (°)</label><input type="number" data-f="az" value="${ap.az}" step="5"></div>` : ''}
       <div class="row"><label>Posizione (m)</label><input type="number" data-f="x" value="${ap.x.toFixed(2)}" step="0.1" aria-label="X"><input type="number" data-f="y" value="${ap.y.toFixed(2)}" step="0.1" aria-label="Y"></div>
+      <div class="row"><label>Note installatore</label><input type="text" data-f="note" value="${esc(ap.note || '')}" placeholder="es. a soffitto, sopra la porta" aria-label="Note per l'installatore" style="flex:1"></div>
       <div class="row"><button class="btn danger" id="apDel">Elimina AP</button></div>`;
     $('apDel').onclick = () => removeAp(ap.id);
     renderLegend();
@@ -1051,6 +1083,7 @@
     else if (f === 'ch24' || f === 'ch5') ap[f] = +v;
     else if (f === 'tx24' || f === 'tx5') { const band = f.slice(2), p = apBandParams(Object.assign({}, ap, { on24: true, on5: true }), band); ap[f] = Math.abs(+v - p.txMax) < 0.05 ? null : +v; }
     else if (f === 'az') ap.az = +v || 0;
+    else if (f === 'note') { ap.note = v.trim(); return; }
     else if (f === 'x' || f === 'y') ap[f] = +v;
     renderApPanel(); rebuildComposite(); render(); scheduleCompute();
   });
@@ -1287,7 +1320,8 @@
   };
 
   // ---------------- report PDF ----------------
-  function pdfEnsure(doc, y, need) { if (y + need > 283) { doc.addPage(); return 20; } return y; }
+  let PDF_BOTTOM = 283, PDF_TOP = 20; // limiti verticali della pagina (A4 verticale per il report)
+  function pdfEnsure(doc, y, need) { if (y + need > PDF_BOTTOM) { doc.addPage(); return PDF_TOP; } return y; }
   function pdfSection(doc, x, y, title) {
     y = pdfEnsure(doc, y, 12);
     doc.setFont('helvetica', 'bold'); doc.setFontSize(11.5); doc.setTextColor(30, 41, 59);
@@ -1350,7 +1384,7 @@
     draw(headers, true, hfill);
     for (const r of rows) {
       const h = rowH(r);
-      if (y + h > 283) { doc.addPage(); y = 20; draw(headers, true, hfill); }
+      if (y + h > PDF_BOTTOM) { doc.addPage(); y = PDF_TOP; draw(headers, true, hfill); }
       draw(r, false, null);
     }
     y += 3;
@@ -1474,6 +1508,117 @@
     const tag = scope === 'both' ? 'entrambe_le_bande' : (S.band === '24' ? '2g4' : '5g');
     doc.save(`${baseName()}_report_${tag}.pdf`);
     toast('Report PDF generato.');
+  };
+
+  // ---------------- pianta per l'installatore ----------------
+  // PDF in scala con la sola pianta, le posizioni e i nomi degli AP (nessuna area di copertura),
+  // più una tabella con i dati di montaggio da consegnare a chi installa la rete.
+  const PRINT_SCALES = [20, 25, 50, 75, 100, 125, 150, 200, 250, 300, 400, 500, 750, 1000, 1250, 1500, 2000, 2500, 5000];
+  $('btnInstaller').onclick = () => {
+    const a = calcArea();
+    if (!a) { toast('Carica prima una pianta.'); return; }
+    if (!S.aps.length) { toast('Nessun access point da stampare: aggiungili nella scheda AP.'); return; }
+    if (!(window.jspdf && window.jspdf.jsPDF)) { toast('Libreria PDF non disponibile.'); return; }
+    const fmtName = $('instFormat') ? $('instFormat').value : 'a3';
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: fmtName, orientation: 'landscape' });
+    const PDF_REPL = { '≥': '>=', '≤': '<=', '≈': '~', '−': '-', '–': '-', '’': "'", '·': '-' };
+    const pdfClean = (t) => typeof t === 'string' ? t.replace(/[≥≤≈−–’·]/g, (c) => PDF_REPL[c]) : t;
+    const _text = doc.text.bind(doc), _split = doc.splitTextToSize.bind(doc);
+    doc.text = (txt, x, yy, opt) => _text(Array.isArray(txt) ? txt.map(pdfClean) : pdfClean(txt), x, yy, opt);
+    doc.splitTextToSize = (txt, w, opt) => _split(pdfClean(txt), w, opt);
+
+    const pw = doc.internal.pageSize.getWidth(), ph = doc.internal.pageSize.getHeight();
+    const mg = 10, tbH = 24, gap = 4;
+    const availW = pw - 2 * mg, availH = ph - 2 * mg - tbH - gap;
+    const wm = a.x1 - a.x0, hm = a.y1 - a.y0;
+    const need = Math.max(wm * 1000 / availW, hm * 1000 / availH);
+    const den = PRINT_SCALES.find(d => d >= need) || Math.ceil(need / 1000) * 1000;
+    const imgW = wm * 1000 / den, imgH = hm * 1000 / den;
+    const ix = mg + (availW - imgW) / 2, iy = mg + (availH - imgH) / 2;
+
+    // tela: ~8 px/mm (circa 200 dpi), al massimo 6000 px per lato
+    const pxmm = Math.min(8, 6000 / imgW, 6000 / imgH);
+    const W = Math.round(imgW * pxmm), H = Math.round(imgH * pxmm);
+    const saved = { view: Object.assign({}, S.view), CW, CH, dpr, K };
+    const off = document.createElement('canvas'); off.width = W; off.height = H;
+    const octx = off.getContext('2d');
+    S.view = { cx: (a.x0 + a.x1) / 2, cy: (a.y0 + a.y1) / 2, s: W / wm };
+    CW = W; CH = H; dpr = 1;
+    K = pxmm * 0.27; // cerchio AP ~5 mm di diametro e testo ~3 mm, a qualsiasi scala
+    printMode = true;
+    try { drawTo(octx, () => render()); }
+    finally { printMode = false; S.view = saved.view; CW = saved.CW; CH = saved.CH; dpr = saved.dpr; K = saved.K; }
+    render();
+
+    // --- pagina 1: pianta ---
+    doc.addImage(off.toDataURL('image/png'), 'PNG', ix, iy, imgW, imgH, undefined, 'FAST');
+    doc.setDrawColor(150); doc.setLineWidth(0.25); doc.rect(ix, iy, imgW, imgH);
+    // origine delle coordinate (angolo in basso a sinistra della pianta)
+    const ox = ix, oy = iy + imgH;
+    doc.setDrawColor(30); doc.setLineWidth(0.35);
+    doc.line(ox, oy, ox + 9, oy); doc.line(ox + 9, oy, ox + 7.3, oy - 0.9); doc.line(ox + 9, oy, ox + 7.3, oy + 0.9);
+    doc.line(ox, oy, ox, oy - 9); doc.line(ox, oy - 9, ox - 0.9, oy - 7.3); doc.line(ox, oy - 9, ox + 0.9, oy - 7.3);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(30);
+    doc.text('X', ox + 10, oy + 0.9); doc.text('Y', ox - 0.9, oy - 10); doc.text('0,0', ox + 1, oy - 1.2);
+
+    // cartiglio
+    const ty = ph - mg - tbH, tw = pw - 2 * mg;
+    doc.setDrawColor(60); doc.setLineWidth(0.35); doc.rect(mg, ty, tw, tbH);
+    const c1 = tw * 0.42, c2 = tw * 0.30;
+    doc.line(mg + c1, ty, mg + c1, ty + tbH); doc.line(mg + c1 + c2, ty, mg + c1 + c2, ty + tbH);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(15);
+    doc.text('Posizionamento access point WiFi', mg + 3, ty + 7);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(70);
+    doc.text(doc.splitTextToSize(`Pianta: ${S.fileName || 'progetto'}`, c1 - 6).slice(0, 1), mg + 3, ty + 12.5);
+    doc.text(`${S.aps.length} access point · altezza di montaggio prevista ${fmt(S.hAp, 1)} m`, mg + 3, ty + 17);
+    doc.text(`Coordinate in metri dall'origine 0,0 (angolo in basso a sinistra della pianta)`, mg + 3, ty + 21.2);
+    // scala numerica e grafica
+    const sx0 = mg + c1 + 3;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(15);
+    doc.text(`Scala 1:${den}`, sx0, ty + 7);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(90);
+    doc.text(`su foglio ${fmtName.toUpperCase()} - stampare al 100% (senza "adatta alla pagina")`, sx0, ty + 11.5);
+    const maxBar = c2 - 12;
+    let L = [1, 2, 5, 10, 20, 25, 50, 100, 200, 500].filter(v => v * 1000 / den <= maxBar).pop() || 1;
+    const barMm = L * 1000 / den, seg = barMm / 4, by0 = ty + 16;
+    for (let i = 0; i < 4; i++) { doc.setFillColor(i % 2 ? 255 : 30); doc.rect(sx0 + i * seg, by0, seg, 1.8, 'FD'); }
+    doc.setFontSize(6.5); doc.setTextColor(30);
+    doc.text('0', sx0, by0 + 5); doc.text(`${fmt(L / 2, L % 2 ? 1 : 0)}`, sx0 + 2 * seg, by0 + 5, { align: 'center' }); doc.text(`${fmt(L, 0)} m`, sx0 + barMm, by0 + 5, { align: 'center' });
+    // dati consegna
+    const rx = mg + c1 + c2 + 3, now = new Date();
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(60);
+    doc.text(`Emesso il ${now.toLocaleDateString('it-IT')}`, rx, ty + 6);
+    doc.text('Installatore: ______________________________', rx, ty + 12);
+    doc.text('Data installazione: ________________________', rx, ty + 17);
+    doc.text('Firma: _____________________________________', rx, ty + 22);
+
+    // --- pagina 2: elenco AP ---
+    doc.addPage();
+    const savedB = [PDF_BOTTOM, PDF_TOP]; PDF_BOTTOM = ph - 12; PDF_TOP = 16;
+    let y = 16;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(15);
+    doc.text('Elenco access point da installare', mg, y); y += 5.5;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(100);
+    doc.text(`${S.fileName || 'progetto'} - scala pianta 1:${den} - coordinate X,Y in metri dall'origine 0,0 indicata sulla pianta`, mg, y);
+    doc.setTextColor(20); y += 8;
+    const rows = S.aps.map((ap, i) => {
+      const m = modelOf(ap.model);
+      const p24 = apBandParams(ap, '24'), p5 = apBandParams(ap, '5');
+      const chs = [p24 ? `2,4 GHz: ch ${ap.ch24}` : null, p5 ? `5 GHz: ch ${ap.ch5}` : null].filter(Boolean).join('\n') || 'radio spenta';
+      const txs = [p24 ? `${fmt(p24.tx, p24.tx % 1 ? 1 : 0)} (2,4)` : null, p5 ? `${fmt(p5.tx, p5.tx % 1 ? 1 : 0)} (5)` : null].filter(Boolean).join('\n') || '-';
+      return [String(i + 1), ap.name, m.name, `${fmt(ap.x - a.x0, 2)} / ${fmt(ap.y - a.y0, 2)}`, fmt(S.hAp, 1),
+        m.beam < 360 ? `${fmt(ap.az, 0)}° (apertura ${m.beam}°)` : 'omni', chs, txs, ap.note || '', '[   ]'];
+    });
+    const base = [9, 22, 36, 24, 14, 24, 26, 18, 76, 14]; // 263 mm su A4 orizzontale
+    const sc = (pw - 2 * mg) / base.reduce((s2, v) => s2 + v, 0);
+    y = pdfTable(doc, mg, y, base.map(v => v * sc),
+      ['N.', 'Nome', 'Modello', 'X / Y (m)', 'Altezza (m)', 'Orientamento', 'Canali', 'TX (dBm)', 'Note', 'Installato'], rows,
+      'Orientamento: 0° = verso destra sulla pianta (asse X), angoli in senso antiorario. Altezza = quota di montaggio usata nel calcolo; verificarla in cantiere. Canali e potenze sono quelli usati nel progetto e vanno impostati sugli apparati.');
+    PDF_BOTTOM = savedB[0]; PDF_TOP = savedB[1];
+
+    doc.save(`${baseName()}_pianta_installatore.pdf`);
+    toast('Pianta per l’installatore generata.');
   };
 
   function syncControls() {
