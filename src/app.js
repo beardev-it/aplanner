@@ -746,7 +746,7 @@
     ctx.fillStyle = p ? cssVar('--muted') : cssVar('--danger'); ctx.font = `11px ${cssVar('--mono')}`; ctx.fillText(sub, bx + 6, by + 28);
     ctx.restore();
   }
-  // AP nella pianta per l'installatore: cerchio numerato + nome e modello, senza dati radio
+  // AP nella pianta per l'installatore: solo cerchio numerato (nome e modello vanno nella legenda sotto la pianta)
   function drawApPrint(ap, num) {
     const X = sx(ap.x), Y = sy(ap.y), m = modelOf(ap.model);
     ctx.save(); ctx.translate(X, Y); ctx.scale(K, K);
@@ -763,14 +763,6 @@
     ctx.fillStyle = '#ffffff'; ctx.font = `700 ${num > 9 ? 9 : 10.5}px ${cssVar('--sans')}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(String(num), 0, 0.5);
     ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-    const label = ap.name, sub = m.name;
-    ctx.font = `700 12px ${cssVar('--sans')}`; const w1 = ctx.measureText(label).width;
-    ctx.font = `10px ${cssVar('--sans')}`; const w2 = ctx.measureText(sub).width;
-    const bw = Math.max(w1, w2) + 10, bx = 14, by = -16;
-    ctx.fillStyle = '#ffffff'; ctx.globalAlpha = .92; roundRect(bx, by, bw, 30, 4); ctx.fill(); ctx.globalAlpha = 1;
-    ctx.strokeStyle = ap.color; ctx.lineWidth = 1; roundRect(bx, by, bw, 30, 4); ctx.stroke();
-    ctx.fillStyle = '#111'; ctx.font = `700 12px ${cssVar('--sans')}`; ctx.fillText(label, bx + 5, by + 13);
-    ctx.fillStyle = '#444'; ctx.font = `10px ${cssVar('--sans')}`; ctx.fillText(sub, bx + 5, by + 25);
     ctx.restore();
   }
   function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
@@ -1530,12 +1522,19 @@
 
     const pw = doc.internal.pageSize.getWidth(), ph = doc.internal.pageSize.getHeight();
     const mg = 10, tbH = 24, gap = 4;
-    const availW = pw - 2 * mg, availH = ph - 2 * mg - tbH - gap;
+    // legenda sotto la pianta: numero -> nome e modello, su più colonne
+    const lgItem = (ap, i) => `${ap.name} - ${modelOf(ap.model).name}`;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+    const lgColW = Math.min(pw - 2 * mg, Math.max(...S.aps.map((ap, i) => doc.getTextWidth(pdfClean(lgItem(ap, i))))) + 14);
+    const lgCols = Math.max(1, Math.floor((pw - 2 * mg) / lgColW));
+    const lgRows = Math.ceil(S.aps.length / lgCols), lgRowH = 5.2;
+    const lgH = 7 + lgRows * lgRowH;
+    const availW = pw - 2 * mg, availH = ph - 2 * mg - tbH - gap - lgH - gap;
     const wm = a.x1 - a.x0, hm = a.y1 - a.y0;
     const need = Math.max(wm * 1000 / availW, hm * 1000 / availH);
     const den = PRINT_SCALES.find(d => d >= need) || Math.ceil(need / 1000) * 1000;
     const imgW = wm * 1000 / den, imgH = hm * 1000 / den;
-    const ix = mg + (availW - imgW) / 2, iy = mg + (availH - imgH) / 2;
+    const ix = mg + (availW - imgW) / 2, iy = mg + Math.max(0, availH - imgH);
 
     // tela: ~8 px/mm (circa 200 dpi), al massimo 6000 px per lato
     const pxmm = Math.min(8, 6000 / imgW, 6000 / imgH);
@@ -1561,6 +1560,26 @@
     doc.line(ox, oy, ox, oy - 9); doc.line(ox, oy - 9, ox - 0.9, oy - 7.3); doc.line(ox, oy - 9, ox + 0.9, oy - 7.3);
     doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(30);
     doc.text('X', ox + 10, oy + 0.9); doc.text('Y', ox - 0.9, oy - 10); doc.text('0,0', ox + 1, oy - 1.2);
+
+    // legenda
+    const ly0 = iy + imgH + gap + 1;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(30);
+    doc.text('Legenda access point', mg, ly0 + 2.5);
+    S.aps.forEach((ap, i) => {
+      const col = Math.floor(i / lgRows), row = i % lgRows; // numerazione per colonne
+      const lx = mg + col * lgColW, ly = ly0 + 7 + row * lgRowH;
+      const [r, g, b] = hexRgb(ap.color);
+      doc.setFillColor(r, g, b); doc.setDrawColor(255); doc.setLineWidth(0.3);
+      doc.circle(lx + 2.2, ly - 1.1, 2.2, 'FD');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(i + 1 > 9 ? 5.8 : 6.8); doc.setTextColor(255);
+      doc.text(String(i + 1), lx + 2.2, ly - 0.95, { align: 'center', baseline: 'middle' });
+      doc.setFontSize(8); doc.setTextColor(20);
+      doc.text(ap.name, lx + 6, ly);
+      const nw = doc.getTextWidth(pdfClean(ap.name));
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(80);
+      doc.text(` - ${modelOf(ap.model).name}`, lx + 6 + nw, ly);
+    });
+    doc.setTextColor(20);
 
     // cartiglio
     const ty = ph - mg - tbH, tw = pw - 2 * mg;
